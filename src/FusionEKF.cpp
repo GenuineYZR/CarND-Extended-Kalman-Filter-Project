@@ -39,7 +39,9 @@ FusionEKF::FusionEKF() {
   H_laser_ << 1, 0, 0, 0,
 	  0, 1, 0, 0;
 
-  Hj_ = tools.CalculateJacobian(ekf_.x_);
+  Hj_ << 0, 0, 0, 0,
+	  0, 0, 0, 0,
+	  0, 0, 0, 0;
 
   ekf_.P_ = MatrixXd(4, 4);
   ekf_.P_ << 1, 0, 0, 0,
@@ -76,7 +78,7 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
       * Remember: you'll need to convert radar from polar to cartesian coordinates.
     */
     // first measurement
-    cout << "EKF2: " << endl;
+    cout << "EKF: " << endl;
     ekf_.x_ = VectorXd(4);
     ekf_.x_ << 1, 1, 1, 1;
 
@@ -86,9 +88,11 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
       */
 		float a = measurement_pack.raw_measurements_[0];
 		float b = measurement_pack.raw_measurements_[1];
-		float x = sqrt(a * a / (tan(b) + 1));
-		float y = tan(b) * x;
-		ekf_.x_ << x, y, 0, 0;
+		float x = a * cos(b);
+		float y = a * sin(b);
+		float vx = 0;
+		float vy = 0;
+		ekf_.x_ << x, y, vx, vy;
 
     }
     else if (measurement_pack.sensor_type_ == MeasurementPackage::LASER) {
@@ -114,7 +118,7 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
      * Update the process noise covariance matrix.
      * Use noise_ax = 9 and noise_ay = 9 for your Q matrix.
    */
-  float dt = measurement_pack.timestamp_ - previous_timestamp_;
+  float dt = (measurement_pack.timestamp_ - previous_timestamp_) / 1000000.0;
   previous_timestamp_ = measurement_pack.timestamp_;
 
   ekf_.F_ << 1, 0, dt, 0,
@@ -123,8 +127,8 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
 	  0, 0, 0, 1;
 
   float dt2 = dt * dt;
-  float dt3 = a * dt;
-  float dt4 = b * dt;
+  float dt3 = dt2 * dt;
+  float dt4 = dt3 * dt;
   float noise_ax = 9;
   float noise_ay = 9;
   
@@ -153,9 +157,10 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
 	  
 	  ekf_.R_ = R_radar_;
 	  
+	  Hj_ = tools.CalculateJacobian(ekf_.x_);
 	  ekf_.H_ = Hj_;
 
-	  ekf_.UpdateEKF(const Eigen::VectorXd &z_r);
+	  ekf_.UpdateEKF(z_r);
 
   } else {
     // Laser updates
@@ -167,7 +172,7 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
 
 	  ekf_.H_ = H_laser_;
 
-	  ekf_.Update(const Eigen::VectorXd &z_l);
+	  ekf_.Update(z_l);
 
   }
 

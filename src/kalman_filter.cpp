@@ -1,4 +1,5 @@
 #include "kalman_filter.h"
+#include <iostream>
 
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
@@ -40,6 +41,7 @@ void KalmanFilter::Update(const VectorXd &z) {
 	MatrixXd Si = S.inverse();
 	MatrixXd K = P_ * Ht * Si;
 
+	MatrixXd I;
 	x_ = x_ + (K * y);
 	long x_size = x_.size();
 	I = MatrixXd::Identity(x_size, x_size);
@@ -58,11 +60,41 @@ void KalmanFilter::UpdateEKF(const VectorXd &z) {
 	VectorXd h_x(3);
 
 	float a = sqrt(px * px + py * py);
-	float b = atan2(py / px);
-	float c = (px * vx + py * vy) / a;
-	h_x << a, b, c;
+	float b = 0;
+	float c = 0;
+	// check if divided by zero
+	if (fabs(px) < 0.0001)
+	{
+		std::cout << "When converting x_ from polar to cartesian coordinates - Division by Zero" << std::endl;
+	}
+	else
+	{
+		b = atan2(py, px);
+	}
+	// check if divided by zero
+	if (a < 0.0001)
+	{
+		std::cout << "When converting x_ from polar to cartesian coordinates - Division by Zero" << std::endl;
+	}
+	else
+	{
+		c = (px * vx + py * vy) / a;
+	}
 
+	h_x << a, b, c;
+	std::cout << h_x << std::endl;
 	VectorXd y = z - h_x;
+	
+	//Normalize angles
+	if (y[1] < -M_PI)
+	{
+		y[1] += 2 * M_PI;
+	}
+	if (y[1] > M_PI)
+	{
+		y[1] -= 2 * M_PI;
+	}
+
 	MatrixXd Ht = H_.transpose();
 	MatrixXd S = H_ * P_ * Ht + R_;
 	MatrixXd Si = S.inverse();
@@ -70,7 +102,7 @@ void KalmanFilter::UpdateEKF(const VectorXd &z) {
 
 	x_ = x_ + (K * y);
 	long x_size = x_.size();
-	I = MatrixXd::Identity(x_size, x_size);
+	MatrixXd I = MatrixXd::Identity(x_size, x_size);
 	P_ = (I - K * H_) * P_;
 
 }
